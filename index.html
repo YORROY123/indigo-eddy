@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>藍渦 — 藍染水流</title>
+<style>
+  :root{
+    --washi:#EDEBE2; --washi-deep:#DFDCCF;
+    --indigo:#162844; --indigo-faint:#5C6B82; --kohaku:#9A6A3A;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden}
+  body{
+    background:var(--washi);
+    font-family:"Yu Mincho","YuMincho","Hiragino Mincho ProN","Noto Serif CJK TC","Noto Serif TC","PMingLiU",serif;
+    color:var(--indigo); cursor:crosshair;
+  }
+  .washi-layer{position:fixed;inset:0;pointer-events:none;z-index:3;opacity:.5;mix-blend-mode:multiply}
+  .washi-layer svg{width:100%;height:100%}
+  .vignette{position:fixed;inset:0;pointer-events:none;z-index:4;
+    background:radial-gradient(ellipse at 50% 46%, transparent 56%, rgba(40,52,78,.16) 100%)}
+  #ink{position:fixed;inset:0;width:100%;height:100%;z-index:2;mix-blend-mode:multiply;display:block}
+
+  .title{position:fixed;top:0;right:clamp(20px,6vw,84px);z-index:5;
+    writing-mode:vertical-rl;display:flex;flex-direction:row;gap:1.05rem;
+    padding-top:clamp(28px,7vh,72px);pointer-events:none;
+    animation:hang 1.9s cubic-bezier(.2,.7,.2,1) both}
+  @keyframes hang{from{transform:translateY(-14px);opacity:0}to{transform:none;opacity:1}}
+  .title h1{font-size:clamp(2.4rem,6vmin,4rem);font-weight:600;letter-spacing:.5em;color:var(--indigo)}
+  .title .sub{font-size:clamp(.78rem,1.7vmin,.98rem);letter-spacing:.4em;color:var(--indigo-faint);padding-top:.4em}
+
+  .seal{position:fixed;right:clamp(20px,6vw,84px);bottom:clamp(26px,7vh,64px);z-index:5;
+    width:clamp(34px,4.6vmin,46px);height:clamp(34px,4.6vmin,46px);
+    background:var(--kohaku);color:var(--washi);display:flex;align-items:center;justify-content:center;
+    font-size:clamp(1.05rem,2.6vmin,1.4rem);font-weight:700;border-radius:3px;transform:rotate(-2deg);
+    box-shadow:0 0 0 1px rgba(154,106,58,.3);mix-blend-mode:multiply;pointer-events:none;
+    animation:stamp .5s 1.7s cubic-bezier(.3,1.6,.5,1) both}
+  @keyframes stamp{from{transform:rotate(-2deg) scale(1.6);opacity:0}to{transform:rotate(-2deg) scale(1);opacity:1}}
+
+  .hint{position:fixed;left:clamp(22px,6vw,84px);bottom:clamp(28px,7vh,66px);z-index:5;
+    writing-mode:vertical-rl;font-size:clamp(.76rem,1.6vmin,.92rem);letter-spacing:.38em;
+    color:var(--indigo-faint);pointer-events:none;transition:opacity 2.4s ease;
+    animation:hang 2s .6s cubic-bezier(.2,.7,.2,1) both}
+  .hint.gone{opacity:0}
+
+  /* 進入調墨房的入口 */
+  .enter{position:fixed;left:clamp(22px,6vw,84px);top:clamp(28px,7vh,66px);z-index:6;
+    writing-mode:vertical-rl;text-decoration:none;font-family:inherit;
+    font-size:clamp(.82rem,1.8vmin,1rem);letter-spacing:.42em;color:var(--indigo-faint);
+    padding:.2em .35em;border-right:1px solid rgba(92,107,130,.4);transition:color .4s}
+  .enter:hover,.enter:focus-visible{color:var(--indigo)}
+  .enter:focus-visible{outline:1.5px solid var(--kohaku);outline-offset:4px}
+
+  @media (prefers-reduced-motion:reduce){.title,.hint,.seal{animation:none}}
+</style>
+</head>
+<body>
+
+<canvas id="ink"></canvas>
+
+<div class="washi-layer" aria-hidden="true">
+  <svg xmlns="http://www.w3.org/2000/svg">
+    <filter id="paper">
+      <feTurbulence type="fractalNoise" baseFrequency="0.011 0.05" numOctaves="4" seed="13" result="fiber"/>
+      <feColorMatrix in="fiber" type="matrix"
+        values="0 0 0 0 0.84  0 0 0 0 0.83  0 0 0 0 0.76  0 0 0 0.9 0"/>
+      <feComposite operator="over" in2="SourceGraphic"/>
+    </filter>
+    <rect width="100%" height="100%" fill="#EDEBE2" filter="url(#paper)"/>
+    <filter id="grain">
+      <feTurbulence type="turbulence" baseFrequency="0.85" numOctaves="2" seed="5"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.32 0 0 0 0 0.36 0 0 0 0 0.44 0 0 0 0.05 0"/>
+    </filter>
+    <rect width="100%" height="100%" filter="url(#grain)"/>
+  </svg>
+</div>
+<div class="vignette" aria-hidden="true"></div>
+
+<a class="enter" href="lab.html">入調墨房 ▸</a>
+
+<header class="title">
+  <h1>藍渦</h1>
+  <p class="sub">藍染・渦のゆらぎ</p>
+</header>
+
+<p class="hint" id="hint">輕撫攪動水流 ── 按住滴藍</p>
+<div class="seal" aria-hidden="true">藍</div>
+
+<script src="fluid.js"></script>
+<script>
+(function(){
+  const canvas=document.getElementById('ink');
+  const hint=document.getElementById('hint');
+  try{
+    Fluid.create(canvas,{
+      onFirstInteract(){ setTimeout(()=>hint.classList.add('gone'),1800); }
+    });
+  }catch(e){
+    document.body.insertAdjacentHTML('beforeend',
+      '<p style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:9">此瀏覽器不支援 WebGL,水無法流動。</p>');
+  }
+})();
+</script>
+</body>
+</html>
