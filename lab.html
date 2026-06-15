@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>調墨房 — 藍渦控制台</title>
+<style>
+  :root{
+    --washi:#EDEBE2; --indigo:#162844; --indigo-faint:#5C6B82; --kohaku:#9A6A3A;
+    --panel:rgba(237,235,226,.82); --line:rgba(40,52,78,.16);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden}
+  body{
+    background:var(--washi);
+    font-family:"Yu Mincho","YuMincho","Hiragino Mincho ProN","Noto Serif CJK TC","Noto Serif TC",serif;
+    color:var(--indigo); cursor:crosshair;
+  }
+  .washi-layer{position:fixed;inset:0;pointer-events:none;z-index:3;opacity:.5;mix-blend-mode:multiply}
+  .washi-layer svg{width:100%;height:100%}
+  .vignette{position:fixed;inset:0;pointer-events:none;z-index:4;
+    background:radial-gradient(ellipse at 50% 46%, transparent 56%, rgba(40,52,78,.16) 100%)}
+  #ink{position:fixed;inset:0;width:100%;height:100%;z-index:2;mix-blend-mode:multiply;display:block}
+
+  /* ── 控制面板 ── */
+  .panel{
+    position:fixed;top:clamp(14px,3vh,28px);left:clamp(14px,3vw,28px);z-index:8;
+    width:clamp(240px,27vw,320px);max-height:calc(100vh - clamp(28px,6vh,56px));
+    overflow-y:auto;background:var(--panel);
+    -webkit-backdrop-filter:blur(9px);backdrop-filter:blur(9px);
+    border:1px solid var(--line);border-radius:10px;
+    box-shadow:0 8px 30px rgba(22,40,68,.14);
+    font-family:"Helvetica Neue",system-ui,"Noto Sans TC",sans-serif;
+    transition:transform .35s cubic-bezier(.2,.7,.2,1),opacity .35s ease;
+  }
+  .panel.collapsed{transform:translateX(calc(-100% - 40px));opacity:0;pointer-events:none}
+  .panel-head{
+    display:flex;align-items:baseline;justify-content:space-between;gap:.6rem;
+    padding:14px 16px 10px;border-bottom:1px solid var(--line);
+  }
+  .panel-head .name{font-family:"Yu Mincho",serif;font-size:1.05rem;letter-spacing:.18em;color:var(--indigo)}
+  .panel-head .meta{font-size:.66rem;letter-spacing:.08em;color:var(--indigo-faint)}
+  .group{padding:12px 16px 4px}
+  .group + .group{border-top:1px solid var(--line)}
+  .group .gtitle{font-size:.62rem;letter-spacing:.22em;text-transform:uppercase;color:var(--indigo-faint);margin-bottom:8px}
+
+  .row{margin-bottom:11px}
+  .row label{display:flex;justify-content:space-between;font-size:.74rem;color:var(--indigo);margin-bottom:5px}
+  .row label .val{color:var(--kohaku);font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+  .row .desc{font-size:.62rem;color:var(--indigo-faint);margin-top:3px;line-height:1.35}
+
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:100%;height:3px;border-radius:3px;
+    background:linear-gradient(var(--indigo),var(--indigo));background-size:var(--fill,50%) 100%;
+    background-repeat:no-repeat;background-color:rgba(40,52,78,.18);cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;
+    background:var(--washi);border:2px solid var(--indigo);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;
+    background:var(--washi);border:2px solid var(--indigo);cursor:pointer}
+
+  .colorrow{display:flex;align-items:center;gap:10px}
+  .colorrow input[type=color]{width:38px;height:26px;border:1px solid var(--line);border-radius:6px;background:none;cursor:pointer;padding:0}
+  .colorrow span{font-size:.74rem;color:var(--indigo)}
+
+  .buttons{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:12px 16px 16px}
+  .buttons button{
+    font-family:"Yu Mincho",serif;letter-spacing:.12em;font-size:.8rem;color:var(--indigo);
+    background:rgba(255,255,255,.4);border:1px solid var(--line);border-radius:7px;
+    padding:8px 4px;cursor:pointer;transition:background .25s,color .25s;
+  }
+  .buttons button:hover{background:var(--indigo);color:var(--washi)}
+  .buttons button.wide{grid-column:1 / -1}
+  .buttons button.amber:hover{background:var(--kohaku)}
+
+  /* 收合鈕(面板藏起時仍可叫出) */
+  .toggle{
+    position:fixed;top:clamp(14px,3vh,28px);left:clamp(14px,3vw,28px);z-index:9;
+    font-family:"Yu Mincho",serif;font-size:.9rem;letter-spacing:.2em;color:var(--indigo);
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:8px 12px;cursor:pointer;-webkit-backdrop-filter:blur(9px);backdrop-filter:blur(9px);
+    box-shadow:0 4px 16px rgba(22,40,68,.12);opacity:0;pointer-events:none;transition:opacity .3s;
+  }
+  .toggle.show{opacity:1;pointer-events:auto}
+
+  .home{
+    position:fixed;right:clamp(16px,4vw,40px);top:clamp(14px,3vh,28px);z-index:8;
+    text-decoration:none;font-family:"Yu Mincho",serif;font-size:.86rem;letter-spacing:.2em;
+    color:var(--indigo-faint);transition:color .3s;
+  }
+  .home:hover{color:var(--indigo)}
+
+  .toast{
+    position:fixed;bottom:clamp(20px,5vh,40px);left:50%;transform:translateX(-50%) translateY(20px);
+    z-index:10;background:var(--indigo);color:var(--washi);font-size:.78rem;letter-spacing:.08em;
+    padding:8px 16px;border-radius:20px;opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<canvas id="ink"></canvas>
+
+<div class="washi-layer" aria-hidden="true">
+  <svg xmlns="http://www.w3.org/2000/svg">
+    <filter id="paper">
+      <feTurbulence type="fractalNoise" baseFrequency="0.011 0.05" numOctaves="4" seed="13" result="fiber"/>
+      <feColorMatrix in="fiber" type="matrix" values="0 0 0 0 0.84  0 0 0 0 0.83  0 0 0 0 0.76  0 0 0 0.9 0"/>
+      <feComposite operator="over" in2="SourceGraphic"/>
+    </filter>
+    <rect width="100%" height="100%" fill="#EDEBE2" filter="url(#paper)"/>
+    <filter id="grain">
+      <feTurbulence type="turbulence" baseFrequency="0.85" numOctaves="2" seed="5"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.32 0 0 0 0 0.36 0 0 0 0 0.44 0 0 0 0.05 0"/>
+    </filter>
+    <rect width="100%" height="100%" filter="url(#grain)"/>
+  </svg>
+</div>
+<div class="vignette" aria-hidden="true"></div>
+
+<a class="home" href="index.html">◂ 回掛軸</a>
+<button class="toggle" id="toggle">調 ▸</button>
+
+<aside class="panel" id="panel">
+  <div class="panel-head">
+    <span class="name">調墨房</span>
+    <span class="meta" id="ctx">WebGL</span>
+  </div>
+
+  <div class="group">
+    <div class="gtitle">流場 Flow</div>
+    <div class="row" data-k="CURL" data-min="0" data-max="40" data-step="0.5">
+      <label>渦度 <span class="val"></span></label>
+      <input type="range">
+      <div class="desc">渦度約束強度,墨絲捲曲、絲縷感的來源。</div>
+    </div>
+    <div class="row" data-k="VELOCITY_DISSIPATION" data-min="0" data-max="3" data-step="0.01">
+      <label>流場黏滯 <span class="val"></span></label>
+      <input type="range">
+      <div class="desc">越大,水流越快靜止(黏度感)。</div>
+    </div>
+    <div class="row" data-k="PRESSURE_ITER" data-min="1" data-max="40" data-step="1">
+      <label>壓力迭代 <span class="val"></span></label>
+      <input type="range">
+      <div class="desc">Jacobi 投影次數,越高越接近不可壓縮(較吃效能)。</div>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="gtitle">墨色 Ink</div>
+    <div class="row" data-k="DENSITY_DISSIPATION" data-min="0" data-max="3" data-step="0.01">
+      <label>墨色消散 <span class="val"></span></label>
+      <input type="range">
+      <div class="desc">越大,墨痕越快淡去沉澱;設 0 則永久留存。</div>
+    </div>
+    <div class="row" data-k="INK_GAIN" data-min="0.3" data-max="2.2" data-step="0.05">
+      <label>整體墨量 <span class="val"></span></label>
+      <input type="range">
+    </div>
+    <div class="row" data-k="EDGE" data-min="0" data-max="1.5" data-step="0.02">
+      <label>聚邊暈染 <span class="val"></span></label>
+      <input type="range">
+      <div class="desc">墨水在紙纖維邊界濃聚的程度。</div>
+    </div>
+    <div class="row">
+      <label>墨色</label>
+      <div class="colorrow">
+        <input type="color" id="color">
+        <span id="colorhex"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="gtitle">筆觸 Brush</div>
+    <div class="row" data-k="SPLAT_FORCE" data-min="1000" data-max="9000" data-step="100">
+      <label>注入力道 <span class="val"></span></label>
+      <input type="range">
+    </div>
+    <div class="row" data-k="SPLAT_RADIUS" data-min="0.001" data-max="0.012" data-step="0.0005">
+      <label>筆觸大小 <span class="val"></span></label>
+      <input type="range">
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="gtitle">解析度 Resolution(變更會重置)</div>
+    <div class="row reinit" data-k="SIM_RES" data-min="64" data-max="256" data-step="4">
+      <label>模擬解析度 <span class="val"></span></label>
+      <input type="range">
+      <div class="desc">速度場網格。低=快、糊;高=細、耗能。</div>
+    </div>
+    <div class="row reinit" data-k="DYE_RES" data-min="256" data-max="1024" data-step="32">
+      <label>染料解析度 <span class="val"></span></label>
+      <input type="range">
+      <div class="desc">墨色畫面解析度,決定視覺銳利度。</div>
+    </div>
+  </div>
+
+  <div class="buttons">
+    <button id="drop">滴一滴</button>
+    <button id="pause">暫停</button>
+    <button id="wash">淨水</button>
+    <button id="defaults">還原預設</button>
+    <button id="copy" class="wide amber">複製參數 JSON</button>
+  </div>
+</aside>
+
+<div class="toast" id="toast">已複製到剪貼簿</div>
+
+<script src="fluid.js"></script>
+<script>
+(function(){
+  const canvas=document.getElementById('ink');
+  let sim;
+  try{
+    sim = Fluid.create(canvas,{ interactionTarget: canvas });
+  }catch(e){
+    document.body.insertAdjacentHTML('beforeend',
+      '<p style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:9">此瀏覽器不支援 WebGL,水無法流動。</p>');
+    return;
+  }
+  document.getElementById('ctx').textContent = sim.isWebGL2 ? 'WebGL 2' : 'WebGL 1';
+
+  // 在面板外放開滑鼠,確保停止滴墨
+  addEventListener('mouseup',()=>{ sim.pointer.down=false; });
+
+  const P = sim.params;
+
+  // 顏色 ⇄ hex
+  const clamp01=v=>Math.max(0,Math.min(1,v));
+  const toHex=c=>'#'+c.map(v=>Math.round(clamp01(v)*255).toString(16).padStart(2,'0')).join('');
+  const fromHex=h=>{const n=parseInt(h.slice(1),16);return [(n>>16&255)/255,(n>>8&255)/255,(n&255)/255];};
+
+  // 綁定所有滑桿
+  const rows = [...document.querySelectorAll('.row[data-k]')];
+  function setFill(input){
+    const min=+input.min,max=+input.max,v=+input.value;
+    input.style.setProperty('--fill', ((v-min)/(max-min)*100)+'%');
+  }
+  function fmtVal(k,v){
+    if(k==='PRESSURE_ITER'||k==='SPLAT_FORCE'||k==='SIM_RES'||k==='DYE_RES') return Math.round(v);
+    if(k==='SPLAT_RADIUS') return v.toFixed(4);
+    return (+v).toFixed(2);
+  }
+  rows.forEach(row=>{
+    const k=row.dataset.k, input=row.querySelector('input'), val=row.querySelector('.val');
+    input.min=row.dataset.min; input.max=row.dataset.max; input.step=row.dataset.step;
+    input.value=P[k]; val.textContent=fmtVal(k,P[k]); setFill(input);
+    const isReinit=row.classList.contains('reinit');
+    input.addEventListener('input',()=>{
+      const v=+input.value; P[k]=v; val.textContent=fmtVal(k,v); setFill(input);
+      if(isReinit) sim.reinit();   // 變更解析度即重建緩衝(會清空)
+    });
+  });
+
+  // 顏色
+  const colorInput=document.getElementById('color'), colorHex=document.getElementById('colorhex');
+  function syncColorUI(){ const h=toHex(P.COLOR); colorInput.value=h; colorHex.textContent=h.toUpperCase(); }
+  syncColorUI();
+  colorInput.addEventListener('input',()=>{ P.COLOR=fromHex(colorInput.value); colorHex.textContent=colorInput.value.toUpperCase(); });
+
+  function syncAll(){
+    rows.forEach(row=>{
+      const k=row.dataset.k, input=row.querySelector('input'), val=row.querySelector('.val');
+      input.value=P[k]; val.textContent=fmtVal(k,P[k]); setFill(input);
+    });
+    syncColorUI();
+  }
+
+  // 按鈕
+  document.getElementById('drop').onclick = ()=> sim.drop();
+  document.getElementById('wash').onclick = ()=> sim.reset();
+  const pauseBtn=document.getElementById('pause');
+  pauseBtn.onclick = ()=>{ P.PAUSED=!P.PAUSED; pauseBtn.textContent=P.PAUSED?'繼續':'暫停'; };
+  document.getElementById('defaults').onclick = ()=>{
+    Object.assign(P, JSON.parse(JSON.stringify(Fluid.DEFAULTS)));
+    sim.reinit(); syncAll(); pauseBtn.textContent='暫停';
+  };
+
+  const toast=document.getElementById('toast');
+  document.getElementById('copy').onclick = async ()=>{
+    const keys=['SIM_RES','DYE_RES','DENSITY_DISSIPATION','VELOCITY_DISSIPATION','PRESSURE_ITER','CURL','SPLAT_RADIUS','SPLAT_FORCE','EDGE','INK_GAIN','COLOR'];
+    const out={}; keys.forEach(k=>out[k]=P[k]);
+    const text=JSON.stringify(out,null,2);
+    try{ await navigator.clipboard.writeText(text); }
+    catch(e){ console.log(text); }
+    toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),1400);
+  };
+
+  // 面板收合
+  const panel=document.getElementById('panel'), toggle=document.getElementById('toggle');
+  // 在面板標題列點兩下可收起;用獨立鈕叫出
+  panel.querySelector('.panel-head').addEventListener('dblclick',()=>{
+    panel.classList.add('collapsed'); toggle.classList.add('show');
+  });
+  toggle.onclick = ()=>{ panel.classList.remove('collapsed'); toggle.classList.remove('show'); };
+})();
+</script>
+</body>
+</html>
